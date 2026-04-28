@@ -1,0 +1,26 @@
+import type { FrequencyItem } from '../types/frequency';
+
+export const frequencies: FrequencyItem[] = [
+  { id: 'bern-app-lszb', name: 'Bern APP', icao: 'LSZB', frequency: '127.325' },
+  { id: 'bern-twr-lszb', name: 'Bern TWR', icao: 'LSZB', frequency: '121.030' },
+  { id: 'bex-lsgb', name: 'Bex', icao: 'LSGB', frequency: '122.155' },
+  { id: 'bressaucourt-lszq', name: 'Bressaucourt', icao: 'LSZQ', frequency: '122.055' },
+  { id: 'ecuvillens-lsge', name: 'Ecuvillens', icao: 'LSGE', frequency: '120.630' },
+  { id: 'geneve-arr-lsgg', name: 'Genève ARR', icao: 'LSGG', frequency: '136.255' },
+  { id: 'geneve-dep-lsgg', name: 'Genève DEP', icao: 'LSGG', frequency: '119.530' },
+  { id: 'geneve-transit-lsgg', name: 'Genève Transit', icao: 'LSGG', frequency: '136.455' },
+  { id: 'geneve-twr-lsgg', name: 'Genève TWR', icao: 'LSGG', frequency: '118.705' },
+  { id: 'geneve-vdf-lsgg', name: 'Genève VDF', icao: 'LSGG', frequency: '119.700' },
+  { id: 'gruyeres-lsgt', name: 'Gruyères', icao: 'LSGT', frequency: '124.680' },
+  { id: 'la-cote-lsgp', name: 'La Côte', icao: 'LSGP', frequency: '123.655' },
+  { id: 'lausanne-lsgl', name: 'Lausanne', icao: 'LSGL', frequency: '123.205' },
+  { id: 'les-eplatures-twr-lsgc', name: 'Les Eplatures TWR', icao: 'LSGC', frequency: '118.130' },
+  { id: 'meiringen-twr-lsmm', name: 'Meiringen TWR', icao: 'LSMM', frequency: '130.155' },
+  { id: 'neuchatel-lsgn', name: 'Neuchâtel', icao: 'LSGN', frequency: '123.605' },
+  { id: 'payerne-app-lsmp', name: 'Payerne APP', icao: 'LSMP', frequency: '136.355' },
+  { id: 'payerne-twr-lsmp', name: 'Payerne TWR', icao: 'LSMP', frequency: '128.680' },
+  { id: 'saanen-lsgk', name: 'Saanen', icao: 'LSGK', frequency: '119.430' },
+  { id: 'sion-app-lsgs', name: 'Sion APP', icao: 'LSGS', frequency: '126.830' },
+  { id: 'sion-twr-lsgs', name: 'Sion TWR', icao: 'LSGS', frequency: '118.275' },
+  { id: 'yverdon-les-bains-lsgy', name: 'Yverdon-les-bains', icao: 'LSGY', frequency: '131.130' },
+];
