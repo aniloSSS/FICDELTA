@@ -17,7 +17,7 @@ export const icaoNames: IcaoNameItem[] = [
   { id: 'bex-lsgb', name: 'Bex', icao: 'LSGB' },
   { id: 'zermatt-lsez', name: 'Zermatt', icao: 'LSEZ' },
   { id: 'raron-lsta', name: 'Raron', icao: 'LSTA' },
-  { id: 'locarno-lsgl', name: 'Locarno', icao: 'LSGL' }, // TODO: Verify ICAO code; source document lists LSGL.
+  { id: 'locarno-lszl', name: 'Locarno', icao: 'LSZL' },
   { id: 'munster-lspu', name: 'Munster', icao: 'LSPU' },
   { id: 'reichenbach-lsgr', name: 'Reichenbach', icao: 'LSGR' },
   { id: 'thun-lszw', name: 'Thun', icao: 'LSZW' },

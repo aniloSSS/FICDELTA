@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { IcaoNameItem } from '../types/icaoName';
 
 type IcaoNameTrainerProps = {
@@ -13,6 +13,58 @@ const modes: { label: string; value: TrainerMode }[] = [
   { label: 'Airfield quiz', value: 'airfieldToIcao' },
   { label: 'List', value: 'list' },
 ];
+
+const editableItemsStorageKey = 'fic-delta-icao-names-items';
+
+function normalizeStoredItems(items: IcaoNameItem[]) {
+  return items.map((item) => {
+    if (item.name.toLowerCase() === 'locarno') {
+      return {
+        ...item,
+        id: 'locarno-lszl',
+        icao: 'LSZL',
+      };
+    }
+
+    return item;
+  });
+}
+
+function getInitialItems(items: IcaoNameItem[]) {
+  if (typeof window === 'undefined') {
+    return items;
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(editableItemsStorageKey);
+
+    if (!storedValue) {
+      return items;
+    }
+
+    const storedItems = JSON.parse(storedValue) as IcaoNameItem[];
+
+    if (!Array.isArray(storedItems) || storedItems.length === 0) {
+      return items;
+    }
+
+    return normalizeStoredItems(storedItems);
+  } catch {
+    return items;
+  }
+}
+
+function createItemId(name: string, icao: string) {
+  const slug = `${name}-${icao}`
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return `${slug}-${Date.now()}`;
+}
 
 function getOptionItems(items: IcaoNameItem[], currentIndex: number) {
   if (items.length <= 4) {
@@ -33,32 +85,61 @@ function getOptionItems(items: IcaoNameItem[], currentIndex: number) {
 }
 
 export default function IcaoNameTrainer({ items }: IcaoNameTrainerProps) {
+  const [editableItems, setEditableItems] = useState<IcaoNameItem[]>(() =>
+    getInitialItems(items),
+  );
   const [mode, setMode] = useState<TrainerMode>('flashcards');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isRevealed, setIsRevealed] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState('');
+  const [draftIcao, setDraftIcao] = useState('');
 
-  const currentItem = items[currentIndex];
+  const safeCurrentIndex = Math.min(currentIndex, Math.max(editableItems.length - 1, 0));
+  const currentItem = editableItems[safeCurrentIndex] ?? editableItems[0];
   const optionItems = useMemo(
-    () => getOptionItems(items, currentIndex),
-    [currentIndex, items],
+    () => getOptionItems(editableItems, safeCurrentIndex),
+    [safeCurrentIndex, editableItems],
   );
   const visibleItems = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
 
     if (!normalizedSearch) {
-      return items;
+      return editableItems;
     }
 
-    return items.filter((item) =>
+    return editableItems.filter((item) =>
       `${item.name} ${item.icao}`.toLowerCase().includes(normalizedSearch),
     );
-  }, [items, searchQuery]);
+  }, [editableItems, searchQuery]);
 
-  const correctAnswer = currentItem.id;
+  const correctAnswer = currentItem?.id ?? '';
   const hasAnswered = selectedAnswer !== null;
   const isCorrect = selectedAnswer === correctAnswer;
+
+  useEffect(() => {
+    if (currentIndex >= editableItems.length) {
+      setCurrentIndex(0);
+      resetCard();
+    }
+  }, [currentIndex, editableItems.length]);
+
+  function saveEditableItems(nextItems: IcaoNameItem[]) {
+    const sortedItems = [...nextItems].sort((firstItem, secondItem) =>
+      firstItem.name.localeCompare(secondItem.name),
+    );
+
+    setEditableItems(sortedItems);
+    window.localStorage.setItem(editableItemsStorageKey, JSON.stringify(sortedItems));
+  }
+
+  function resetEditor() {
+    setEditingItemId(null);
+    setDraftName('');
+    setDraftIcao('');
+  }
 
   function resetCard(nextMode?: TrainerMode) {
     setIsRevealed(false);
@@ -70,7 +151,50 @@ export default function IcaoNameTrainer({ items }: IcaoNameTrainerProps) {
   }
 
   function handleNext() {
-    setCurrentIndex((index) => (index + 1) % items.length);
+    setCurrentIndex((index) => (index + 1) % editableItems.length);
+    resetCard();
+  }
+
+  function handleEditItem(item: IcaoNameItem) {
+    setEditingItemId(item.id);
+    setDraftName(item.name);
+    setDraftIcao(item.icao);
+  }
+
+  function handleDeleteItem(itemId: string) {
+    saveEditableItems(editableItems.filter((item) => item.id !== itemId));
+    resetEditor();
+    resetCard();
+  }
+
+  function handleSaveItem() {
+    const trimmedName = draftName.trim();
+    const trimmedIcao = draftIcao.trim().toUpperCase();
+
+    if (!trimmedName || !trimmedIcao) {
+      return;
+    }
+
+    if (editingItemId) {
+      saveEditableItems(
+        editableItems.map((item) =>
+          item.id === editingItemId
+            ? { ...item, name: trimmedName, icao: trimmedIcao }
+            : item,
+        ),
+      );
+    } else {
+      saveEditableItems([
+        ...editableItems,
+        {
+          id: createItemId(trimmedName, trimmedIcao),
+          name: trimmedName,
+          icao: trimmedIcao,
+        },
+      ]);
+    }
+
+    resetEditor();
     resetCard();
   }
 
@@ -78,12 +202,12 @@ export default function IcaoNameTrainer({ items }: IcaoNameTrainerProps) {
     return (
       <div className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-center dark:border-slate-700 dark:bg-slate-800">
         <div>
-          <p className="text-xl font-bold text-slate-950 dark:text-white">{items.length}</p>
+          <p className="text-xl font-bold text-slate-950 dark:text-white">{editableItems.length}</p>
           <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Names</p>
         </div>
         <div>
           <p className="text-xl font-bold text-slate-700 dark:text-slate-200">
-            {currentIndex + 1}/{items.length}
+            {safeCurrentIndex + 1}/{editableItems.length}
           </p>
           <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Current</p>
         </div>
@@ -129,18 +253,60 @@ export default function IcaoNameTrainer({ items }: IcaoNameTrainerProps) {
 
       {mode === 'list' ? (
         <div className="bg-slate-50 p-5 dark:bg-slate-900/80 sm:p-6">
-          <label className="block">
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-              Search ICAO names
-            </span>
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search by aerodrome or ICAO code"
-              className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
-            />
-          </label>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)] lg:items-start">
+            <label className="block">
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                Search ICAO names
+              </span>
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search by aerodrome or ICAO code"
+                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+              />
+            </label>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+              <p className="text-sm font-bold text-slate-950 dark:text-white">
+                {editingItemId ? 'Edit ICAO name' : 'Add ICAO name'}
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem]">
+                <input
+                  type="text"
+                  value={draftName}
+                  onChange={(event) => setDraftName(event.target.value)}
+                  placeholder="Aerodrome name"
+                  className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                />
+                <input
+                  type="text"
+                  value={draftIcao}
+                  onChange={(event) => setDraftIcao(event.target.value.toUpperCase())}
+                  placeholder="ICAO"
+                  maxLength={4}
+                  className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold uppercase text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                />
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={handleSaveItem}
+                  disabled={!draftName.trim() || !draftIcao.trim()}
+                  className="rounded-full bg-sky-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {editingItemId ? 'Save changes' : 'Add flashcard'}
+                </button>
+                <button
+                  type="button"
+                  onClick={resetEditor}
+                  className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-800 transition hover:border-sky-300 hover:text-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-sky-400 dark:hover:text-sky-200"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {visibleItems.map((item) => (
@@ -154,6 +320,23 @@ export default function IcaoNameTrainer({ items }: IcaoNameTrainerProps) {
                 <p className="mt-2 text-2xl font-bold text-sky-700 dark:text-sky-300">
                   {item.icao}
                 </p>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => handleEditItem(item)}
+                    className="rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800 transition hover:border-sky-300 hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:border-sky-700 dark:bg-sky-950/60 dark:text-sky-200"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteItem(item.id)}
+                    disabled={editableItems.length <= 1}
+                    className="rounded-full border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200"
+                  >
+                    Delete
+                  </button>
+                </div>
               </article>
             ))}
           </div>
@@ -169,7 +352,7 @@ export default function IcaoNameTrainer({ items }: IcaoNameTrainerProps) {
                       ICAO names
                     </span>
                     <h4 className="mt-6 text-3xl font-bold text-slate-950 dark:text-white sm:text-4xl">
-                      {currentItem.name}
+                      {currentItem?.name ?? 'No ICAO name available'}
                     </h4>
                   </div>
 
@@ -179,7 +362,7 @@ export default function IcaoNameTrainer({ items }: IcaoNameTrainerProps) {
                         ICAO code
                       </p>
                       <p className="mt-3 text-5xl font-black text-slate-950 dark:text-white">
-                        {currentItem.icao}
+                        {currentItem?.icao ?? '-'}
                       </p>
                     </div>
                   ) : (
@@ -200,7 +383,7 @@ export default function IcaoNameTrainer({ items }: IcaoNameTrainerProps) {
                         : 'Which ICAO code belongs to this aerodrome?'}
                     </p>
                     <h4 className="mt-3 text-4xl font-black text-slate-950 dark:text-white sm:text-5xl">
-                      {mode === 'icaoToAirfield' ? currentItem.icao : currentItem.name}
+                      {mode === 'icaoToAirfield' ? currentItem?.icao : currentItem?.name}
                     </h4>
                   </div>
 
@@ -247,7 +430,7 @@ export default function IcaoNameTrainer({ items }: IcaoNameTrainerProps) {
                     >
                       {isCorrect
                         ? 'Correct'
-                        : `Incorrect. Answer: ${currentItem.name} - ${currentItem.icao}`}
+                        : `Incorrect. Answer: ${currentItem?.name} - ${currentItem?.icao}`}
                     </p>
                   )}
                 </>
